@@ -252,5 +252,26 @@ def subscribe():
 # Create the tables when the module loads (gunicorn never runs __main__).
 init_db()
 
+
+def seed_demo_user():
+    """Re-create a demo login on every start. The free-tier disk is wiped on
+    each restart, so this keeps a known account working. Configured through
+    LECTUREHUB_DEMO_EMAIL / LECTUREHUB_DEMO_PASSWORD / LECTUREHUB_DEMO_NAME."""
+    email = (os.environ.get("LECTUREHUB_DEMO_EMAIL") or "").strip().lower()
+    pw = os.environ.get("LECTUREHUB_DEMO_PASSWORD") or ""
+    name = os.environ.get("LECTUREHUB_DEMO_NAME") or "Demo"
+    if not email or len(pw) < 6:
+        return
+    con = db()
+    if con.execute("SELECT 1 FROM users WHERE email=?", (email,)).fetchone() is None:
+        salt = os.urandom(16)
+        con.execute("INSERT INTO users(name,email,password_hash,salt) VALUES(?,?,?,?)",
+                    (name, email, hash_pw(pw, salt.hex()), salt.hex()))
+        con.commit()
+    con.close()
+
+
+seed_demo_user()
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8090, threaded=True)
