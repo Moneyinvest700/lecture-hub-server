@@ -268,7 +268,33 @@ def seed_demo_user():
         con.execute("INSERT INTO users(name,email,password_hash,salt) VALUES(?,?,?,?)",
                     (name, email, hash_pw(pw, salt.hex()), salt.hex()))
         con.commit()
+    uid = con.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()["id"]
+    seed_demo_sessions(con, uid)
     con.close()
+
+
+DEMO_SESSIONS = [
+    ("Demo Lecture 1 - Introduction",
+     "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", "demo,intro"),
+    ("Demo Lecture 2 - Basics",
+     "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3", "demo"),
+    ("Demo Lecture 3 - Practice",
+     "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3", "demo,practice"),
+]
+
+
+def seed_demo_sessions(con, uid):
+    """Give the demo user its sample lectures, but only when it has none.
+    Lectures added at runtime live on the same wiped disk as the user, so
+    after a restart the list is empty again; this refills it exactly once
+    per fresh database and never duplicates rows that already exist."""
+    count = con.execute("SELECT COUNT(*) FROM sessions WHERE user_id=?", (uid,)).fetchone()[0]
+    if count > 0:
+        return
+    con.executemany(
+        "INSERT INTO sessions(user_id,title,audio_url,tags) VALUES(?,?,?,?)",
+        [(uid, title, url, tags) for title, url, tags in DEMO_SESSIONS])
+    con.commit()
 
 
 seed_demo_user()
